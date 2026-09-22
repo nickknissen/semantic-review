@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import spawn from "cross-spawn";
 
 export interface RunResult {
   stdout: string;
@@ -12,11 +12,11 @@ export function run(argv: string[], stdin?: string): Promise<RunResult> {
     const proc = spawn(argv[0], argv.slice(1), { stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
-    proc.stdout.setEncoding("utf8").on("data", (chunk) => (stdout += chunk));
-    proc.stderr.setEncoding("utf8").on("data", (chunk) => (stderr += chunk));
+    proc.stdout!.setEncoding("utf8").on("data", (chunk) => (stdout += chunk));
+    proc.stderr!.setEncoding("utf8").on("data", (chunk) => (stderr += chunk));
     proc.on("error", reject);
     proc.on("close", (code) => resolve({ stdout, stderr, code: code ?? 1 }));
-    if (stdin !== undefined) proc.stdin.write(stdin);
-    proc.stdin.end();
+    if (stdin !== undefined) proc.stdin!.write(stdin);
+    proc.stdin!.end();
   });
 }
