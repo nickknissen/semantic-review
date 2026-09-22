@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { BACKENDS } from "../src/backends";
+import { BACKENDS, cliBackend } from "../src/backends";
 
 const originalFetch = globalThis.fetch;
 const originalOpenAIKey = process.env.OPENAI_API_KEY;
@@ -19,6 +19,30 @@ afterEach(() => {
   else process.env.OPENAI_API_KEY = originalOpenAIKey;
   if (originalAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
   else process.env.ANTHROPIC_API_KEY = originalAnthropicKey;
+});
+
+describe("CLI backends", () => {
+  test("reports an error written to stdout", async () => {
+    const backend = cliBackend("fake", () => [
+      process.execPath,
+      "-e",
+      "process.stdin.resume(); process.stdin.on('end', () => { process.stdout.write('Prompt is too long\\n'); process.exitCode = 1; })",
+    ]);
+
+    await expect(backend.analyze("diff", {})).rejects.toThrow("fake exited 1: Prompt is too long");
+  });
+
+  test("reports the error at the end of verbose stderr", async () => {
+    const backend = cliBackend("fake", () => [
+      process.execPath,
+      "-e",
+      "process.stdin.resume(); process.stdin.on('end', () => { process.stderr.write('echoed prompt: ' + 'x'.repeat(1000) + '\\nError: Input exceeds the maximum length\\n'); process.exitCode = 1; })",
+    ]);
+
+    await expect(backend.analyze("diff", {})).rejects.toThrow(
+      "fake exited 1: Error: Input exceeds the maximum length",
+    );
+  });
 });
 
 describe("API backends", () => {

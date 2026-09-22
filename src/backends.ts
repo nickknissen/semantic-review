@@ -50,13 +50,24 @@ function haveCommand(cmd: string): Promise<boolean> {
 // Agent CLIs run in non-interactive mode with the prompt on stdin and are
 // asked to print JSON only. They use whatever auth the user already has.
 // argv is built per call so --model can map to each CLI's own flag.
-function cliBackend(name: string, argv: (opts: AnalyzeOpts) => string[]): Backend {
+function cliFailureDetail(stdout: string, stderr: string): string {
+  const errorLines = [stderr, stdout]
+    .flatMap((output) => output.split("\n"))
+    .filter((line) => /^error:/i.test(line.trim()));
+  const explicitError = errorLines.at(-1)?.trim();
+  if (explicitError) return explicitError.slice(0, 1000);
+
+  const output = stderr.trim() || stdout.trim();
+  return output.slice(-1000);
+}
+
+export function cliBackend(name: string, argv: (opts: AnalyzeOpts) => string[]): Backend {
   return {
     name,
     available: () => haveCommand(argv({})[0]),
     async analyze(annotatedDiff, opts) {
       const { stdout, stderr, code } = await run(argv(opts), analysisPrompt(annotatedDiff));
-      if (code !== 0) throw new Error(`${name} exited ${code}: ${stderr.slice(0, 500)}`);
+      if (code !== 0) throw new Error(`${name} exited ${code}: ${cliFailureDetail(stdout, stderr)}`);
       return extractAnalysis(stdout);
     },
   };
